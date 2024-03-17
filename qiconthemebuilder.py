@@ -71,7 +71,7 @@ class IconTheme:
         if not (path / 'index.theme').is_file():
             raise RuntimeError('Source is missing index.theme')
         theme_parser = FreeDesktopConfigParser()
-        theme_parser.read(path / 'index.theme')
+        theme_parser.read(path / 'index.theme', encoding='utf-8')
         if not theme_parser.has_section('Icon Theme'):
             raise RuntimeError('index.theme is missing Icon Theme section')
         theme_meta = theme_parser['Icon Theme']
@@ -85,7 +85,7 @@ class IconTheme:
             if not theme_parser.has_section(rel_dir_path):
                 warn(RuntimeWarning('No section about {}'.format(rel_dir_path)))
                 continue
-            if not (path / rel_dir_path).is_dir():
+            if not (path / rel_dir_path).resolve().is_dir():
                 warn(RuntimeWarning('{} is not a directory'.format(rel_dir_path)))
                 continue
             dir_meta = theme_parser[rel_dir_path]
@@ -97,7 +97,7 @@ class IconTheme:
             icon_threshold = dir_meta.get('Threshold', fallback='2')
 
             # Load icons
-            for icon_path in (path / rel_dir_path).iterdir():
+            for icon_path in (path / rel_dir_path).resolve().iterdir():
                 if icon_path.suffix not in ALLOWED_ICON_TYPES:
                     # Skip non-icons.
                     continue
