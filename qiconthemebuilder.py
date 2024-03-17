@@ -1,5 +1,5 @@
 """
-FreeDesktop Icon Theme extractor.
+freedesktop.org Icon Theme extractor.
 
 Copyright (c) 2024
 Distributed under the Boost Software License, Version 1.0.
@@ -184,9 +184,9 @@ def copy_icons(theme: IconTheme, dest: Path, patterns: List[re.Pattern]):
 
 def main():
     args = argparse.ArgumentParser(
-        description='Generate a partial FreeDesktop Icon Theme from an existing theme for use with QIcon.\n'
-                    'See https://standards.freedesktop.org/icon-theme-spec/icon-theme-spec-latest.html for a\n'
-                    'description of how themes are formatted.',
+        description='Generate a partial freedesktop.org Icon Theme from an existing theme for use with QIcon.\n'
+                    'See https://standards.freedesktop.org/icon-theme-spec for a description of how themes are\n'
+                    'formatted. See https://doc.qt.io/qt-6/qicon.html for QIcon usage.',
     )
     args.add_argument('source', type=Path, help='Path to source theme.')
     args.add_argument('dest', type=Path, help='Path to created theme.')
