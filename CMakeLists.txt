@@ -35,32 +35,43 @@ endfunction()
 # directory are the "breeze" and "breeze-dark" icon themes.
 function(build_breeze)
     include(FetchContent)
-    FetchContent_Declare(ECM
+    FetchContent_Declare(ecm
             GIT_REPOSITORY "https://invent.kde.org/frameworks/extra-cmake-modules.git"
             GIT_TAG "master"
     )
-    FetchContent_Populate(ECM)
-    set(ECM_INSTALL_DIR "${FETCHCONTENT_BASE_DIR}/ecm-install")
+    FetchContent_GetProperties(ecm)
+    if (NOT ecm_POPULATED)
+        FetchContent_Populate(ecm)
+    endif ()
+    set(ecm_INSTALL_DIR "${FETCHCONTENT_BASE_DIR}/ecm-install")
     message(STATUS "Building ECM...")
     execute_process(
-            COMMAND "${CMAKE_COMMAND}" -B "${ECM_BINARY_DIR}" -S "${ECM_SOURCE_DIR}"
-            "-DBUILD_TESTING=OFF" "-DCMAKE_INSTALL_PREFIX=${ECM_INSTALL_DIR}"
+            COMMAND "${CMAKE_COMMAND}" -B "${ecm_BINARY_DIR}" -S "${ecm_SOURCE_DIR}"
+            "-DBUILD_TESTING=OFF" "-DCMAKE_INSTALL_PREFIX=${ecm_INSTALL_DIR}"
             COMMAND_ERROR_IS_FATAL ANY
     )
     execute_process(
-            COMMAND "${CMAKE_COMMAND}" --install "${ECM_BINARY_DIR}"
+            COMMAND "${CMAKE_COMMAND}" --install "${ecm_BINARY_DIR}"
             COMMAND_ERROR_IS_FATAL ANY
     )
     FetchContent_Declare(breeze_icons
             GIT_REPOSITORY "https://invent.kde.org/frameworks/breeze-icons.git"
             GIT_TAG "master"
     )
-    FetchContent_Populate(breeze_icons)
+
+
+    FetchContent_GetProperties(breeze_icons)
+    if (NOT breeze_icons_POPULATED)
+        FetchContent_Populate(breeze_icons)
+    endif ()
     set(breeze_icons_INSTALL_DIR "${FETCHCONTENT_BASE_DIR}/breeze_icons-install")
     message(STATUS "Building breeze_icons...")
     execute_process(
             COMMAND "${CMAKE_COMMAND}" -B "${breeze_icons_BINARY_DIR}" -S "${breeze_icons_SOURCE_DIR}"
-            "-DECM_DIR=${ECM_INSTALL_DIR}/share/ECM/cmake" "-DQt6_DIR=${Qt6_DIR}"
+            "-DECM_DIR=${ecm_INSTALL_DIR}/share/ECM/cmake"
+            "-DQt6_DIR=${Qt6_DIR}"
+            "-DQt6Core_DIR=${Qt6Core_DIR}"
+            "-DQt6Gui_DIR=${Qt6Gui_DIR}"
             "-DCMAKE_INSTALL_PREFIX=${breeze_icons_INSTALL_DIR}"
             COMMAND_ERROR_IS_FATAL ANY
     )
