@@ -34,25 +34,39 @@ endfunction()
 # When complete, sets breeze_icons_DIR to the icon's installation path. Below this
 # directory are the "breeze" and "breeze-dark" icon themes.
 function(build_breeze)
-    include(ExternalProject)
-    set(ecm_PREFIX "${PROJECT_BINARY_DIR}/_deps/ecm-prefix")
-    ExternalProject_Add(ECM
-            EXCLUDE_FROM_ALL
+    include(FetchContent)
+    FetchContent_Declare(ECM
             GIT_REPOSITORY "https://invent.kde.org/frameworks/extra-cmake-modules.git"
             GIT_TAG "master"
-            PREFIX "${ecm_PREFIX}"
-            CMAKE_CACHE_ARGS "-DBUILD_TESTING:STRING=OFF" "-DCMAKE_INSTALL_PREFIX:STRING=${ecm_PREFIX}"
     )
-    set(breeze_icons_PREFIX "${PROJECT_BINARY_DIR}/_deps/breeze_icons-prefix")
-    set(breeze_icons_RESULT_DIR "${breeze_icons_PREFIX}/bin/data/icons")
-    ExternalProject_Add(breeze_icons
-            EXCLUDE_FROM_ALL
+    FetchContent_Populate(ECM)
+    set(ECM_INSTALL_DIR "${FETCHCONTENT_BASE_DIR}/ecm-install")
+    message(STATUS "Building ECM...")
+    execute_process(
+            COMMAND "${CMAKE_COMMAND}" -B "${ECM_BINARY_DIR}" -S "${ECM_SOURCE_DIR}"
+            "-DBUILD_TESTING=OFF" "-DCMAKE_INSTALL_PREFIX=${ECM_INSTALL_DIR}"
+            COMMAND_ERROR_IS_FATAL ANY
+    )
+    execute_process(
+            COMMAND "${CMAKE_COMMAND}" --install "${ECM_BINARY_DIR}"
+            COMMAND_ERROR_IS_FATAL ANY
+    )
+    FetchContent_Declare(breeze_icons
             GIT_REPOSITORY "https://invent.kde.org/frameworks/breeze-icons.git"
             GIT_TAG "master"
-            DEPENDS "ECM"
-            PREFIX "${breeze_icons_PREFIX}"
-            CMAKE_CACHE_ARGS "-DECM_DIR:STRING=${ecm_PREFIX}/share/ECM/cmake" "-DCMAKE_INSTALL_PREFIX:STRING=${breeze_icons_PREFIX}"
-            INSTALL_BYPRODUCTS "${breeze_icons_RESULT_DIR}/breeze/index.theme" "${breeze_icons_RESULT_DIR}/breeze-dark/index.theme"
     )
-    set(breeze_icons_DIR "${breeze_icons_RESULT_DIR}" PARENT_SCOPE)
+    FetchContent_Populate(breeze_icons)
+    set(breeze_icons_INSTALL_DIR "${FETCHCONTENT_BASE_DIR}/breeze_icons-install")
+    message(STATUS "Building breeze_icons...")
+    execute_process(
+            COMMAND "${CMAKE_COMMAND}" -B "${breeze_icons_BINARY_DIR}" -S "${breeze_icons_SOURCE_DIR}"
+            "-DECM_DIR=${ECM_INSTALL_DIR}/share/ECM/cmake" "-DQt6_DIR=${Qt6_DIR}"
+            "-DCMAKE_INSTALL_PREFIX=${breeze_icons_INSTALL_DIR}"
+            COMMAND_ERROR_IS_FATAL ANY
+    )
+    execute_process(
+            COMMAND "${CMAKE_COMMAND}" --install "${breeze_icons_BINARY_DIR}"
+            COMMAND_ERROR_IS_FATAL ANY
+    )
+    set(breeze_icons_DIR "${breeze_icons_INSTALL_DIR}/bin/data/icons" PARENT_SCOPE)
 endfunction()
