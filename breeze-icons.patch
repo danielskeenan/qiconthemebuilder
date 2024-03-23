@@ -1,0 +1,136 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index b850294e..19aeb679 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -34,9 +34,7 @@ find_package (Python 3 COMPONENTS Interpreter)
+ 
+ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+ 
+-# FIXME: This is a temporary solution to unbreak KDE's Windows CI.
+-# Remove "NOT WIN32" when icon generation works on Windows.
+-if(Python_FOUND AND NOT WIN32)
++if(Python_FOUND)
+     # Find lxml Python 3 module
+     exec_program(${Python_EXECUTABLE}
+         ARGS "-c \"import lxml; from lxml import etree; print(lxml.get_include())\""
+@@ -58,6 +56,21 @@ if(WITH_ICON_GENERATION)
+     find_package(Qt6 NO_MODULE REQUIRED Core Gui)
+     add_executable(generate-symbolic-dark generate-symbolic-dark.cpp)
+     target_link_libraries(generate-symbolic-dark PUBLIC Qt6::Core)
++    if(WIN32)
++        qt_generate_deploy_app_script(
++                TARGET generate-symbolic-dark
++                OUTPUT_SCRIPT generate_symbolic_dark_DEPLOY_SCRIPT_FILE
++                NO_TRANSLATIONS
++                NO_COMPILER_RUNTIME
++                NO_UNSUPPORTED_PLATFORM_ERROR
++        )
++        add_custom_command(
++                TARGET generate-symbolic-dark POST_BUILD
++                COMMAND "${CMAKE_COMMAND}" "-DCMAKE_INSTALL_PREFIX=$<TARGET_FILE_DIR:generate-symbolic-dark>" -DQT_DEPLOY_BIN_DIR=.
++                -DQT_DEPLOY_LIB_DIR=. -P "${generate_symbolic_dark_DEPLOY_SCRIPT_FILE}"
++                VERBATIM
++        )
++    endif ()
+ endif()
+ 
+ add_feature_info("Icon generation" ${WITH_ICON_GENERATION} "for 24x24 and symbolic dark icons.
+@@ -72,6 +85,21 @@ if(BINARY_ICONS_RESOURCE OR ICONS_LIBRARY)
+     find_package(Qt6 NO_MODULE REQUIRED Core)
+     add_executable(qrcAlias qrcAlias.cpp)
+     target_link_libraries(qrcAlias PUBLIC Qt6::Core)
++    if(WIN32)
++        qt_generate_deploy_app_script(
++                TARGET qrcAlias
++                OUTPUT_SCRIPT qrc_alias_DEPLOY_SCRIPT_FILE
++                NO_TRANSLATIONS
++                NO_COMPILER_RUNTIME
++                NO_UNSUPPORTED_PLATFORM_ERROR
++        )
++        add_custom_command(
++                TARGET qrcAlias POST_BUILD
++                COMMAND "${CMAKE_COMMAND}" "-DCMAKE_INSTALL_PREFIX=$<TARGET_FILE_DIR:qrcAlias>" -DQT_DEPLOY_BIN_DIR=.
++                -DQT_DEPLOY_LIB_DIR=. -P "${qrc_alias_DEPLOY_SCRIPT_FILE}"
++                VERBATIM
++        )
++    endif ()
+ 
+ function(generate_binary_resource target outfile)
+     set(RESOURCES_WORKING_DIR ${CMAKE_CURRENT_BINARY_DIR}/res)
+diff --git a/generate-24px-versions.py b/generate-24px-versions.py
+index 02c4e145..01e15d81 100755
+--- a/generate-24px-versions.py
++++ b/generate-24px-versions.py
+@@ -64,36 +64,37 @@ def get_renderable_elements(root: etree.Element):
+ 
+ 
+ def make_dir(input_dir, output_dir, path):
+-    if not path.endswith('/22'):
++    if path.name != '22':
+         return
+ 
+-    folder24_destination = path.replace(input_dir, output_dir, 1).replace('/22', '/24')
++    folder24_destination = output_dir / path.relative_to(input_dir).with_name('24')
+ 
+     # Make 24/
+-    Path(folder24_destination).mkdir(parents=True, exist_ok=True)
++    folder24_destination.mkdir(parents=True, exist_ok=True)
+ 
+     # Make 24@2x/ and 24@3x/
+     for scale in (2, 3):
+-        folder24_scaled_destination = folder24_destination.replace('/24', f'/24@{scale}x')
+-        if os.path.islink(folder24_scaled_destination):
+-            os.remove(folder24_scaled_destination)
+-        os.symlink("24", folder24_scaled_destination, target_is_directory=True)
++        folder24_scaled_destination = folder24_destination.with_name(f'24@{scale}x')
++        if folder24_scaled_destination.is_symlink():
++            folder24_scaled_destination.unlink()
++        folder24_scaled_destination.symlink_to('24', target_is_directory=True)
+ 
+ 
+ def make_file(input_dir, output_dir, path):
+     # Filter out files
+-    if not (path.endswith('.svg') and '/22/' in path):
++    if not (path.suffix == '.svg' and path.parent.name == '22'):
+         return
+ 
+-    file_destination = path.replace(input_dir, output_dir, 1).replace('/22/', '/24/')
++    file_destination = output_dir / path.relative_to(input_dir).parent.with_name('24') / path.name
+ 
+     # Regenerate symlinks or edit SVGs
+-    if os.path.islink(path):
+-        symlink_source = os.readlink(path).replace('/22/', '/24/')
+-        if os.path.islink(file_destination):
+-            os.remove(file_destination)
+-        if not os.path.exists(file_destination):
+-            os.symlink(symlink_source, file_destination)
++    if path.is_symlink():
++        # Need to handle relative symlinks.
++        symlink_source = (path.parent / path.readlink()).parent.with_name('24') / path.readlink().name
++        if file_destination.is_symlink():
++            file_destination.unlink()
++        if not file_destination.exists():
++            file_destination.symlink_to(symlink_source.relative_to(symlink_source.parent))
+     else:
+         etree.set_default_parser(etree.XMLParser(remove_blank_text=True))
+         tree = etree.parse(path)
+@@ -153,16 +154,16 @@ def make_file(input_dir, output_dir, path):
+             else:
+                 skipped_message += "You shouldn't be seeing this. Please fix " + os.path.basename(sys.argv[0])
+ 
+-            print(path.lstrip(input_dir) + skipped_message)
++            print(str(path.relative_to(input_dir)) + skipped_message)
+ 
+ 
+ def main(input_dirs, output_dir):
+     for input_dir in input_dirs:
+         for dirpath, dirnames, filenames in os.walk(input_dir):
+             for d in dirnames:
+-                make_dir(input_dir, output_dir, os.path.join(dirpath, d))
++                make_dir(input_dir, output_dir, Path(dirpath) / d)
+             for f in filenames:
+-                make_file(input_dir, output_dir, os.path.join(dirpath, f))
++                make_file(input_dir, output_dir, Path(dirpath) / f)
+ 
+ # END defs
+ 

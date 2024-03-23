@@ -1,4 +1,5 @@
 find_package(Python3 COMPONENTS Interpreter REQUIRED)
+find_package(Git REQUIRED)
 
 # Usage: create_icon_theme(<theme_name> TARGET <exe_target_name> SOURCE <source_theme_dir> ICON_PATTERNS <icon_1> [<icon_2>...])
 function(create_icon_theme ICONTHEME_NAME)
@@ -57,8 +58,9 @@ function(build_breeze)
     FetchContent_Declare(breeze_icons
             GIT_REPOSITORY "https://invent.kde.org/frameworks/breeze-icons.git"
             GIT_TAG "master"
+            UPDATE_DISCONNECTED ON
+            PATCH_COMMAND "${GIT_EXECUTABLE}" apply "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/breeze-icons.patch"
     )
-
 
     FetchContent_GetProperties(breeze_icons)
     if (NOT breeze_icons_POPULATED)
@@ -73,6 +75,10 @@ function(build_breeze)
             "-DQt6Core_DIR=${Qt6Core_DIR}"
             "-DQt6Gui_DIR=${Qt6Gui_DIR}"
             "-DCMAKE_INSTALL_PREFIX=${breeze_icons_INSTALL_DIR}"
+            COMMAND_ERROR_IS_FATAL ANY
+    )
+    execute_process(
+            COMMAND "${CMAKE_COMMAND}" --build "${breeze_icons_BINARY_DIR}"
             COMMAND_ERROR_IS_FATAL ANY
     )
     execute_process(

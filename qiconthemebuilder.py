@@ -138,7 +138,12 @@ def copy_icons(theme: IconTheme, dest: Path, patterns: List[re.Pattern]):
         dest_rel_path = dest_dir / icon.path.name
         dest_path = dest / dest_rel_path
         dest_path.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy(icon.path, dest_path, follow_symlinks=True)
+        source_path = icon.path
+        # This works better than follow_symlinks argument to shutil.copy() because that
+        # can fall over if the symlink is relative.
+        if source_path.is_symlink():
+            source_path = icon.path.parent / source_path.readlink()
+        shutil.copy(source_path, dest_path)
         qrc_file = ET.SubElement(qresource, 'file')
         qrc_file.text = str(dest_rel_path)
         if props_hash not in copied_props:
