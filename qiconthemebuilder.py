@@ -8,12 +8,15 @@ Distributed under the Boost Software License, Version 1.0.
 
 import argparse
 import dataclasses
+import hashlib
 import re
 import shutil
+import sys
 import xml.etree.ElementTree as ET
 from configparser import ConfigParser
 from dataclasses import dataclass
 from enum import StrEnum
+from math import ceil
 from pathlib import Path
 from typing import Optional, List
 from warnings import warn
@@ -51,6 +54,16 @@ class IconProperties:
     maxSize: int = Optional[int]
     minSize: int = Optional[int]
     threshold: int = Optional[int]
+
+    def to_hash(self):
+        m = hashlib.sha256()
+        m.update(self.size.to_bytes(4))
+        m.update(self.scale.to_bytes(4))
+        m.update(self.iconType.encode())
+        m.update(0 if self.maxSize is None else self.maxSize.to_bytes(4))
+        m.update(0 if self.minSize is None else self.minSize.to_bytes(4))
+        m.update(0 if self.threshold is None else self.threshold.to_bytes(4))
+        return m.hexdigest()
 
 
 @dataclass
@@ -122,7 +135,7 @@ def copy_icons(theme: IconTheme, dest: Path, patterns: List[re.Pattern]):
     qresource = ET.SubElement(qrc.getroot(), 'qresource', {'prefix': '/icons/{}'.format(dest.stem)})
 
     # Find icons matching a pattern, copy to the destination, and save their properties for later.
-    copied_props: dict[int, IconProperties] = {}
+    copied_props: dict[str, IconProperties] = {}
     directories = set()
     scaled_directories = set()
     for icon in theme.icons:
@@ -133,8 +146,8 @@ def copy_icons(theme: IconTheme, dest: Path, patterns: List[re.Pattern]):
         if match is None:
             # Don't use this icon.
             continue
-        props_hash = hash(icon.props)
-        dest_dir = Path(format(props_hash, 'x'))
+        props_hash = icon.props.to_hash()
+        dest_dir = Path(props_hash)
         dest_rel_path = dest_dir / icon.path.name
         dest_path = dest / dest_rel_path
         dest_path.parent.mkdir(parents=True, exist_ok=True)
@@ -177,7 +190,7 @@ def copy_icons(theme: IconTheme, dest: Path, patterns: List[re.Pattern]):
                 dir_meta['MinSize'] = props.minSize
         elif props.iconType == IconType.THRESHOLD and props.threshold != 2:
             dir_meta['Threshold'] = props.threshold
-        theme_meta[format(props_hash, 'x')] = dir_meta
+        theme_meta[props_hash] = dir_meta
     with (dest / 'index.theme').open('wt', encoding='utf-8') as index_theme_f:
         theme_meta.write(index_theme_f, space_around_delimiters=False)
 
